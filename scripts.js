@@ -13,6 +13,7 @@ $(document).ready(function(){
       return d
     }, function(error, data){
       if (error) throw error
+      setGdata(data)
       // so, i can't do exactly this
       buildGraph(data, "# Poverty", "# Hispanic", svg1)
       buildGraph(data, "# Poverty", "# Black", svg2)
@@ -22,13 +23,30 @@ $(document).ready(function(){
     })
 
 })
+var dict = [];
+var gdata;
 
+function setGdata(data){
+  gdata = data;
+}
+
+function grabBySchoolName(d){ // array of school names
+  var acc = [];
+  for(var i = 0; i < gdata.length;i++){
+    for(var j = 0; j < d.length;j++){
+      if(gdata[i]["School Name"] == d[j]){
+        acc.push(gdata[i])
+      }
+    }
+  }
+  return acc
+}
 
 function buildGraph(data, Xvariable, Yvariable, svg){
 // SCATTERPLOTS
-var margin = {top: 50, right: 100, bottom: 10, left: 100},
-    width = 1000 - margin.left - margin.right,
-    height = 1000 - margin.top - margin.bottom;
+var margin = {top: 10, right: 100, bottom: 60, left: 100},
+    width = 600 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
 
 
     // ready up the axes and scales
@@ -52,10 +70,13 @@ var margin = {top: 50, right: 100, bottom: 10, left: 100},
     .data(data).enter()
     .append("circle")
     .attr('class', 'dot')
+    .attr('class', function(d){return data["School Name"]})
     .attr("r", 5)
     .style("opacity", .5)
     .attr("cx", function(d){return x(parseInt(d[Xvariable]))})
     .attr("cy", function(d){return y(parseInt(d[Yvariable]))})
+    .on("mouseover", mouseover)
+    .on("mouseout", mouseout)
 
     svg.append("g")
     .attr("class","axis axis--x")
@@ -76,16 +97,26 @@ var margin = {top: 50, right: 100, bottom: 10, left: 100},
     svg.append("text")
       .attr("transform",
             "translate(" + ((width + margin.right + margin.left)/2) + " ," +
-                           (height + margin.top + margin.bottom - 20) + ")")
+                           (height + margin.top + margin.bottom - 40) + ")")
       .style("text-anchor", "middle")
       .text(Yvariable)
+
+      function mouseover(d){
+        console.log(d)
+      }
+
+      function mouseout(d){
+        console.log("all done")
+      }
+
+
 }
 
 function buildChart(data, svg){
   // PARALLEL COORDINATES
   var margin = {top: 20, right: 100, bottom: 40, left: 100},
-  width = 1000 - margin.left - margin.right,
-  height = 1000 - margin.top - margin.bottom;
+  width = 600 - margin.left - margin.right,
+  height = 600 - margin.top - margin.bottom;
 
   var x = d3.scale.ordinal().rangePoints([0, width], 1)
   var y = {}
@@ -130,7 +161,9 @@ function buildChart(data, svg){
       .selectAll("path")
       .data(fdata)
       .enter().append("path")
-      .attr("d", path);
+      .attr("d", path)
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout)
 
       // dragging is extraneous
       var g = svg.selectAll(".dimension")
@@ -185,6 +218,17 @@ function buildChart(data, svg){
           });
         }
 
+        function mouseover(d){
+          console.log(d)
+          d3.selectAll("rect").data(d["# Poverty"]).classed("dot-second", true)
+          d3.selectAll("circle").data(d).classed("dot-glow", true)
+        }
+
+        function mouseout(d){
+          d3.selectAll("rect").data(d["# Poverty"]).classed("dot-second", false)
+          d3.selectAll("circle").data(d).classed("dot-glow", false)
+        }
+
 }
 
 function buildHist(fdata, cVariable, svg){
@@ -192,12 +236,18 @@ function buildHist(fdata, cVariable, svg){
   // take an attribute and display it-- number of impoverished students is the attribute i choose
   // woo! its really fucked up but its displaying!
   var margin = {top: 20, right: 100, bottom: 40, left: 100},
-      width = 1000 - margin.left - margin.right,
-      height = 1000 - margin.top - margin.bottom;
+      width = 600 - margin.left - margin.right,
+      height = 600 - margin.top - margin.bottom;
   var x = d3.scale.linear().domain([0, 2000]).range([0, width])
   var formatCount = d3.format(",.0f")
   // Generate a histogram using twenty uniformly-spaced bins.
-  var bins = d3.layout.histogram().bins(x.ticks(30))(fdata.map(function(d){return d["# Poverty"]}))
+  var bins = d3.layout.histogram().bins(x.ticks(30))(fdata.map(function(d){
+    var b = { "# Poverty" : d["# Poverty"],
+    "School Name" : d["School Name"]}
+    dict.push(b);
+    return d["# Poverty"];
+  }))
+  // now i have to make a dictionary from these bins
   var y = d3.scale.linear().domain([0, d3.max(bins, function(d) { return d.y; })]).range([height, 0])
   var xAxis = d3.svg.axis().scale(x).orient("bottom")
 
@@ -214,7 +264,9 @@ function buildHist(fdata, cVariable, svg){
     bar.append("rect")
       .attr("x", 1)
       .attr("width", x(bins[0].dx) - 1)
-      .attr("height", function(d) { return height - y(d.y); });
+      .attr("height", function(d) { return height - y(d.y); })
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout)
 
     bar.append("text")
       .attr("dy", ".75em")
@@ -227,4 +279,36 @@ function buildHist(fdata, cVariable, svg){
       .attr("class", "x axis")
       .attr("transform", "translate(0," + height + ")")
       .call(xAxis);
+
+      function mouseover(d){
+        results = matchToSchools(d)
+        var datas = grabBySchoolName(results)
+        d3.selectAll("circle").data(datas).classed("dot-glow", true)
+      }
+
+      function mouseout(d){
+        results = matchToSchools(d)
+        var datas = grabBySchoolName(results)
+        d3.selectAll("circle").data(datas).classed("dot-glow", false)
+      }
+
+      function makeDict(bins, data){
+        console.log(bins)
+      }
+
+      function matchToSchools(d){
+        var acc = []
+        for (var i = 0;i < d.length;i++){
+          for (var j = 0;j< dict.length; j++){
+            if(dict[j]["# Poverty"] == d[i]){
+              acc.push(dict[j]["School Name"])
+            }
+          }
+        }
+        return acc
+      }
+}
+
+function grab(text){
+  return d3.selectAll(text)
 }

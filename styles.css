@@ -43,3 +43,11 @@ body {
   text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
   cursor: move;
 }
+
+.dot-glow {
+    fill: #FF0000;
+}
+
+.dot-second{
+    fill: #0026FF;
+}
